@@ -32,11 +32,11 @@ if (!fs.existsSync(uploadsDir)) {
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || CLIENT_ORIGINS.includes(origin)) {
+      if (!origin || CLIENT_ORIGINS.length === 0 || CLIENT_ORIGINS.includes(origin)) {
         callback(null, true);
         return;
       }
-      callback(new Error("Not allowed by CORS"));
+      callback(null, false);
     }
   })
 );
@@ -84,7 +84,7 @@ const connectMongo = async () => {
 
 const io = new SocketIOServer(server, {
   cors: {
-    origin: CLIENT_ORIGINS,
+    origin: CLIENT_ORIGINS.length ? CLIENT_ORIGINS : true,
     methods: ["GET", "POST"]
   }
 });
@@ -110,3 +110,6 @@ connectMongo().finally(() => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 });
+
+
+
