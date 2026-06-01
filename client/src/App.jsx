@@ -109,6 +109,18 @@ export default function App() {
 
   const fileSizeLabel = useMemo(() => `${size} MB`, [size]);
 
+  // Detect if we're on a share page
+  const shareMatch = window.location.pathname.match(/^\/share\/([a-zA-Z0-9]+)$/);
+  const isSharePage = !!shareMatch;
+  const shareCode = shareMatch?.[1] || "";
+
+  // Auto-load share if on share page
+  useEffect(() => {
+    if (isSharePage && shareCode && !lookupResult) {
+      setLookupCode(shareCode);
+    }
+  }, [isSharePage, shareCode, lookupResult]);
+
   const appendLog = (message) => {
     setP2pLog((prev) => [...prev.slice(-6), message]);
   };
@@ -206,6 +218,38 @@ export default function App() {
       key,
       buffer
     );
+  };
+
+  const handleLookup = async (code) => {
+    setDownloadError("");
+    try {
+      const response = await api.get(`/shares?code=${code}`);
+      if (response.data && response.data.length > 0) {
+        setLookupResult(response.data[0]);
+      } else {
+        setDownloadError("Share not found");
+      }
+    } catch (error) {
+      setDownloadError("Failed to load share: " + (error.response?.data?.message || error.message));
+    }
+  };
+
+  const handleDownload = async (code) => {
+    setDownloadError("");
+    try {
+      const response = await api.get(`/shares/${code}/download`, {
+        headers: lookupPassword ? { "x-share-password": lookupPassword } : {},
+        responseType: "blob"
+      });
+      const url = window.URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = lookupResult?.name || "download";
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      setDownloadError("Download failed: " + (error.response?.data?.message || error.message));
+    }
   };
 
   const createShare = async () => {
@@ -527,6 +571,50 @@ export default function App() {
     }
     appendLog(`Sent ${p2pFile.name}.`);
   };
+
+  // If on share page, show download view instead of main page
+  if (isSharePage) {
+    return (
+      <div className="page">
+        <div className="background-orbs" aria-hidden="true">
+          <span className="orb orb-1" />
+          <span className="orb orb-2" />
+          <span className="orb orb-3" />
+        </div>
+        <header className="nav">
+          <div className="logo">SendFileOnline Pro</div>
+          <nav>
+            <a href="/">← Back Home</a>
+          </nav>
+        </header>
+
+        <section className="hero">
+          <div className="hero-copy">
+            <h1>Download Shared File</h1>
+            <div className="auth-card">
+              {lookupResult ? (
+                <>
+                  <p><strong>File:</strong> {lookupResult.name}</p>
+                  <p><strong>Size:</strong> {(lookupResult.size / 1024 / 1024).toFixed(2)} MB</p>
+                  <p><strong>Expires:</strong> {new Date(lookupResult.expiresAt).toLocaleDateString()}</p>
+                  {lookupResult.encrypted && (
+                    <input type="password" placeholder="Password" value={lookupPassword} onChange={(e) => setLookupPassword(e.target.value)} />
+                  )}
+                  <button className="btn primary" onClick={() => handleDownload(lookupResult.code)}>Download File</button>
+                  {downloadError && <p className="error">{downloadError}</p>}
+                </>
+              ) : (
+                <>
+                  <p>Loading share details...</p>
+                  <button className="btn primary" onClick={() => handleLookup(shareCode)}>Load Share</button>
+                </>
+              )}
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="page">
