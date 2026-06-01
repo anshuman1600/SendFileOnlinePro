@@ -32,12 +32,24 @@ if (!fs.existsSync(uploadsDir)) {
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || CLIENT_ORIGINS.length === 0 || CLIENT_ORIGINS.includes(origin)) {
+      // Allow requests without origin (like mobile apps, curl)
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+      // Allow configured origins
+      if (CLIENT_ORIGINS.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      // Allow Vercel preview URLs
+      if (origin.includes('vercel.app')) {
         callback(null, true);
         return;
       }
       callback(null, false);
-    }
+    },
+    credentials: true
   })
 );
 app.use(express.json());
